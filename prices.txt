@@ -1,0 +1,6 @@
+default:dirt,5
+default:stone,10
+default:cobblestone,7
+default:wood,12
+default:diamond,500
+default:gold_ingot,150
