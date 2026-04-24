@@ -68,3 +68,44 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         end
     end
 end)
+minetest.register_chatcommand("ah_list", {
+    params = "<start_bid> <buy_now> <increment> <duration_hours>",
+    description = "List held item on Auction House",
+    func = function(name, param)
+        local player = minetest.get_player_by_name(name)
+        local stack = player:get_wielded_item()
+
+        if stack:is_empty() then
+            return false, "Hold an item to list it!"
+        end
+
+        -- Extract the 4 numbers from the command
+        local start_bid, buy_now, inc, hours = param:match("(%d+)%s+(%d+)%s+(%d+)%s+(%d+)")
+        
+        if not start_bid then
+            return false, "Usage: /ah_list <start_bid> <buy_now> <increment> <duration_hours>"
+        end
+
+        start_bid, buy_now, inc, hours = tonumber(start_bid), tonumber(buy_now), tonumber(inc), tonumber(hours)
+
+        -- Cap at 72 hours for server sanity
+        if hours > 72 then hours = 72 end
+
+        local ah = minetest.deserialize(eco_trade.storage:get_string("ah_data")) or {}
+        local auction_id = tostring(os.time()) .. "_" .. name
+        
+        ah[auction_id] = {
+            itemstring = stack:to_string(),
+            seller = name,
+            price = start_bid,
+            buy_now = buy_now,
+            increment = inc,
+            end_time = os.time() + (hours * 3600), -- Current time + hours converted to seconds
+        }
+
+        eco_trade.storage:set_string("ah_data", minetest.serialize(ah))
+        player:set_wielded_item(ItemStack(""))
+        
+        return true, "Item listed for " .. hours .. " hours!"
+    end
+})
