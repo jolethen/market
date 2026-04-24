@@ -30,16 +30,26 @@ local function check_expiry()
 end
 minetest.after(7200, check_expiry)
 
--- The Grid Formspec with Pagination & Balance
+-- The Grid Formspec with Pagination & Physical Balance
 function eco_trade.show_ah(player_name, page)
     page = page or 1
     local ah = get_ah_data()
+    local player = minetest.get_player_by_name(player_name)
+    if not player then return end
     
-    -- 1. 101% REAL BALANCE CHECK
+    -- 1. 101% REAL PHYSICAL BALANCE CHECK
     local balance = 0
-    if minetest.get_modpath("currency") then
-        -- Try multiple ways to get the balance depending on the currency mod version
-        balance = currency.get_money(player_name) or (currency.players and currency.players[player_name]) or 0
+    local inv = player:get_inventory()
+    local main_list = inv:get_list("main")
+    
+    for _, stack in ipairs(main_list) do
+        local itemname = stack:get_name()
+        -- Scan for any Minegeld items in the inventory
+        if itemname:match("currency:minegeld") then
+            -- Extracts the number from name (e.g., "minegeld_10" -> 10)
+            local value = tonumber(itemname:match("_(%d+)$")) or 1
+            balance = balance + (value * stack:get_count())
+        end
     end
 
     -- 2. PAGINATION LOGIC
@@ -48,10 +58,9 @@ function eco_trade.show_ah(player_name, page)
         data.id = id
         table.insert(list, data)
     end
-    -- Sort by time so newest items are first
     table.sort(list, function(a, b) return a.end_time > b.end_time end)
 
-    local items_per_page = 8 -- Fits nicely in the grid
+    local items_per_page = 8 
     local total_pages = math.max(1, math.ceil(#list / items_per_page))
     if page > total_pages then page = total_pages end
     
@@ -82,17 +91,15 @@ function eco_trade.show_ah(player_name, page)
     -- 3. PAGE BUTTONS
     if page > 1 then
         fs = fs .. ("button[0.5,9.0;2,1;prev_page;%d]"):format(page - 1)
-        fs = fs .. "label[0.5,8.8;Back]"
     end
     if page < total_pages then
         fs = fs .. ("button[7.5,9.0;2,1;next_page;%d]"):format(page + 1)
-        fs = fs .. "label[7.5,8.8;Next Page]"
     end
     
     -- 4. BALANCE BAR
     fs = fs .. "box[0,10.2;10,0.8;#000000aa]" 
-    fs = fs .. ("label[0.5,10.6;Your Balance: %d¢]"):format(balance)
-    fs = fs .. "label[6.0,10.6;Click an item to BID or BUY]"
+    fs = fs .. ("label[0.5,10.6;Your Balance: %d¢ (Physical)]"):format(balance)
+    fs = fs .. "label[5.5,10.6;Click an item to BID or BUY]"
     
     minetest.show_formspec(player_name, "eco_trade:ah_main", fs)
 end
