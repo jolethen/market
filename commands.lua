@@ -1,11 +1,5 @@
 -- eco_trade/commands.lua
 
--- Background list (make sure these exist in your textures folder!)
-local bg_textures = {"eco_bg.png", "eco_bg_dark.png", "eco_bg_tech.png", "eco_bg_blue.png"}
-local function get_random_bg()
-    return bg_textures[math.random(#bg_textures)]
-end
-
 -- Helper Function: Check physical balance in total CENTS
 local function get_physical_balance(player)
     local inv = player:get_inventory()
@@ -75,7 +69,7 @@ minetest.register_chatcommand("sell", {
         local c = total_cents % 100
         local payout_str = (d > 0 and d .. "$ " or "") .. (c > 0 and c .. "¢" or "")
 
-        local fs = "size[6,4]background[0,0;6,4;" .. get_random_bg() .. ";true]" ..
+        local fs = "size[6,4]background[0,0;6,4;eco_bg.png;true]" ..
                    "label[1,1;Sell " .. stack:get_count() .. "x " .. stack:get_name() .. "?]" ..
                    "label[1,1.8;Payout: " .. payout_str .. "]" ..
                    "button_exit[1,3;2,1;confirm_sell;CONFIRM]" ..
@@ -216,10 +210,9 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
             end
             
             -- Complex Payment: Remove Minegeld from Inventory
+            -- Using 5-cent increments as the base unit for simple removal
             local remaining = entry.buy_now
             local inv = player:get_inventory()
-            -- Note: In a production environment, you'd iterate through denominations to remove correctly.
-            -- For simplicity here, we assume the player has the change or uses cent_1 equivalents.
             inv:remove_item("main", ItemStack("currency:minegeld_cent_5 " .. (remaining / 5)))
             
             player:get_inventory():add_item("main", ItemStack(entry.itemstring))
