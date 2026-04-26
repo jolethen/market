@@ -1,11 +1,5 @@
 -- eco_trade/auction.lua
 
--- Helper for random backgrounds
-local bg_textures = {"eco_bg.png", "eco_bg_dark.png", "eco_bg_tech.png", "eco_bg_blue.png"}
-local function get_random_bg()
-    return bg_textures[math.random(#bg_textures)]
-end
-
 local function get_ah_data()
     return minetest.deserialize(eco_trade.storage:get_string("ah_data")) or {}
 end
@@ -51,7 +45,7 @@ function eco_trade.show_bid_window(player_name, auction_id)
     local price_text = (d > 0 and d .. "$ " or "") .. (c > 0 and c .. "¢" or "")
     if price_text == "" then price_text = "0¢" end
 
-    local fs = "size[6,5]background[0,0;6,5;" .. get_random_bg() .. ";true]" ..
+    local fs = "size[6,5]background[0,0;6,5;eco_bg.png;true]" ..
                "label[0.5,0.5;Item: " .. entry.itemstring .. "]" ..
                "label[0.5,1.2;Current Bid: " .. price_text .. "]" ..
                "label[0.5,1.6;Min Increment: " .. entry.increment .. "¢]" ..
@@ -68,7 +62,7 @@ function eco_trade.show_ah(player_name, page)
     local player = minetest.get_player_by_name(player_name)
     if not player then return end
     
-    -- Improved Balance Check (100¢ = 1$)
+    -- Physical Balance Check (100¢ = 1$)
     local balance = 0
     local inv = player:get_inventory()
     for _, stack in ipairs(inv:get_list("main")) do
@@ -91,7 +85,7 @@ function eco_trade.show_ah(player_name, page)
     local start_idx = ((page - 1) * items_per_page) + 1
     local end_idx = math.min(start_idx + items_per_page - 1, #list)
 
-    local fs = "size[10,11]background[0,0;10,11;" .. get_random_bg() .. ";true]" ..
+    local fs = "size[10,11]background[0,0;10,11;eco_bg.png;true]" ..
                "label[3.2,0.2;--- AUCTION HOUSE (" .. page .. "/" .. total_pages .. ") ---]"
 
     local now = os.time()
@@ -113,7 +107,6 @@ function eco_trade.show_ah(player_name, page)
         x = x + 2.2 if x > 8.5 then x = 0.8 y = y + 3.0 end
     end
 
-    -- Page buttons and Balance Bar
     if page > 1 then fs = fs .. ("button[0.5,9.2;2,0.8;prev_page;%d]"):format(page - 1) end
     if page < total_pages then fs = fs .. ("button[7.5,9.2;2,0.8;next_page;%d]"):format(page + 1) end
     
