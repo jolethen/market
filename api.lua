@@ -4,61 +4,75 @@ eco_trade.prices = {}
 
 -- 1. Load the prices.txt configuration
 function eco_trade.load_prices()
-    -- Dynamically get the modpath so it never crashes if the folder is renamed
     local path = minetest.get_modpath(minetest.get_current_modname()) .. "/prices.txt"
     local file = io.open(path, "r")
     
     if not file then
-        minetest.log("error", "[eco_trade] prices.txt not found at " .. path)
+        minetest.log("error", "[eco_trade] prices.txt not found!")
         return
     end
 
-    -- Clear existing prices before reloading
     eco_trade.prices = {}
-
     for line in file:lines() do
-        -- Skip empty lines, whitespace-only lines, or comments
         if line:trim() ~= "" and not line:match("^#") then
             local name, price = line:match("([^,]+),([^,]+)")
             if name and price then
-                -- Strip whitespace from the item name for a clean lookup
-                eco_trade.prices[name:gsub("%s+", "")] = tonumber(price)
+                -- Store base price (Ensuring it starts as a multiple of 5)
+                local val = tonumber(price)
+                eco_trade.prices[name:trim()] = math.floor(val / 5) * 5
             end
         end
     end
     file:close()
-    minetest.log("action", "[eco_trade] Loaded " .. #eco_trade.prices .. " prices from prices.txt")
 end
 
--- 2. Calculate the dynamic price based on volume sold
+-- 2. Calculate the dynamic price
 function eco_trade.get_current_price(item_name)
-    -- Check if the item name is an alias (important for some Minetest mods)
-    local real_name = minetest.registered_aliases[item_name] or item_name
-    local base_price = eco_trade.prices[real_name]
+    local base_price = eco_trade.prices[item_name]
+    if not base_price then return nil end
     
-    -- If the item isn't in our price list, the server doesn't buy it
-    if not base_price then 
-        return nil 
-    end
+    local total_sold = eco_trade.storage:get_int("vol:" .. item_name)
     
-    -- Get total units ever sold from Mod Storage
-    local total_sold = eco_trade.storage:get_int("vol:" .. real_name)
+    -- Logic: Drop price by 5¢ for every 50 stacks (3200 units)
+    -- This ensures we always stay in multiples of 5
+    local price_drop = math.floor(total_sold / 3200) * 5
     
-    -- Logic: Drop price by 1¢ for every 10 stacks (640 units) sold to the server
-    local price_drop = math.floor(total_sold / 640)
-    
-    -- Ensure price never drops below 1¢
-    local final_price = math.max(1, base_price - price_drop)
+    -- Ensure price never drops below 5¢
+    local final_price = math.max(5, base_price - price_drop)
     
     return final_price
 end
 
--- 3. Update the volume when a sale is completed
+-- 3. Update volume and timestamp on sale
 function eco_trade.record_sale(item_name, quantity)
-    local real_name = minetest.registered_aliases[item_name] or item_name
-    local current_vol = eco_trade.storage:get_int("vol:" .. real_name)
-    eco_trade.storage:set_int("vol:" .. real_name, current_vol + quantity)
+    local current_vol = eco_trade.storage:get_int("vol:" .. item_name)
+    eco_trade.storage:set_int("vol:" .. item_name, current_vol + quantity)
+    -- Record exactly when this item was last sold
+    eco_trade.storage:set_int("last_sale:" .. item_name, os.time())
 end
 
--- Initialize the price list immediately
+-- 4. Recovery Logic (Runs once every hour)
+-- Checks if items should start getting more expensive again
+local function recover_prices()
+    local now = os.time()
+    for item_name, base_price in pairs(eco_trade.prices) do
+        local last_sale = eco_trade.storage:get_int("last_sale:" .. item_name)
+        local current_vol = eco_trade.storage:get_int("vol:" .. item_name)
+        
+        -- If item hasn't been sold in over 1 hour and volume is > 0
+        if current_vol > 0 and (now - last_sale) >= 3600 then
+            -- Reduce volume by 10% of the total needed for a price bracket
+            -- This ensures it fully recovers in 10 hours (10% * 10 = 100%)
+            local recovery_amount = 320 -- 10% of 3200
+            local new_vol = math.max(0, current_vol - recovery_amount)
+            
+            eco_trade.storage:set_int("vol:" .. item_name, new_vol)
+        end
+    end
+    -- Run again in 1 hour (3600 seconds)
+    minetest.after(3600, recover_prices)
+end
+
+-- Start the recovery loop and load prices
+minetest.after(3600, recover_prices)
 eco_trade.load_prices()
