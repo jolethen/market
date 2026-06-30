@@ -4,3 +4,10 @@ default:cobblestone,7
 default:wood,12
 default:diamond,500
 default:gold_ingot,150
+default:coal,100
+default:steel_ingot,200
+default:tin,200
+default:copper,200
+default: silver,300
+default:mithril,500
+default:mese,200
